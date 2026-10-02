@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Остров Пика</title>
+<style>
+  :root { --ui: rgba(255,255,255,.92); --ink: #1f2a37; --muted: #5b6878; --accent: #2f6fde; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe3f1; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
+  #view { position: fixed; inset: 0; touch-action: none; }
+  canvas { display: block; }
+  .tools { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; }
+  .tools button { width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--ui); box-shadow: 0 2px 8px rgba(0,0,0,.12); font-size: 18px; cursor: pointer; color: var(--ink); }
+  #start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(20,40,60,.35); cursor: pointer; }
+  #start .play { width: 88px; height: 88px; box-shadow: 0 8px 30px rgba(0,0,0,.25); border-radius: 50%; background: var(--accent); display: grid; place-items: center; }
+  #start .play::after { content: ""; border-left: 24px solid #fff; border-top: 15px solid transparent; border-bottom: 15px solid transparent; margin-left: 6px; }
+  #touch { display: none; position: fixed; right: 16px; bottom: 16px; width: 74px; height: 74px; border-radius: 50%; border: 0; background: var(--ui); box-shadow: 0 2px 8px rgba(0,0,0,.15); font-size: 26px; color: var(--ink); }
+  @media (hover: none) { #touch { display: block; } }
+</style>
+</head>
+<body>
+<div id="view"></div>
+
+<div class="tools">
+  <button id="reset" aria-label="В начало тропы">↺</button>
+</div>
+<button id="touch" aria-label="Вперёд">▲</button>
+
+<div id="start" role="button" aria-label="Play"><div class="play"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  const view = document.getElementById('view');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xbfdcf0);
+  scene.fog = new THREE.Fog(0xd6e6f0, 30, 110);
+
+  const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 400);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  view.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xeaf2ff, 0x56703f, 0.55));
+  const sun = new THREE.DirectionalLight(0xfff6e8, 0.6);
+  sun.position.set(30, 50, 20);
+  scene.add(sun);
+
+  const mat = c => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+  function put(geo, color, x, y, z, parent) {
+    const m = new THREE.Mesh(geo, mat(color));
+    m.position.set(x, y, z);
+    (parent || scene).add(m);
+    return m;
+  }
+
+  // вода и остров
+  const water = put(new THREE.CircleGeometry(200, 64), 0x5b9bd5, 0, -0.2, 0);
+  water.rotation.x = -Math.PI / 2;
+  put(new THREE.CylinderGeometry(34, 37, 1.6, 48), 0xe8d7a4, 0, -0.4, 0);
+  put(new THREE.CylinderGeometry(30, 33, 1.6, 48), 0x86b86b, 0, 0, 0);
+  const R_WALK = 31;
+
+  // ручей и мост
+  const stream = put(new THREE.BoxGeometry(4, 0.05, 64), 0x5b9bd5, 8, 0.82, 0);
+  const bridge = new THREE.Group();
+  bridge.position.set(8, 0.8, -6);
+  scene.add(bridge);
+  put(new THREE.BoxGeometry(7, 0.35, 3.2), 0xa0703c, 0, 0.35, 0, bridge);
+  for (const z of [-1.5, 1.5]) {
+    put(new THREE.BoxGeometry(7, 0.18, 0.18), 0x6b4423, 0, 1.4, z, bridge);
+    for (const x of [-3.2, 0, 3.2]) put(new THREE.BoxGeometry(0.2, 1.1, 0.2), 0x6b4423, x, 0.9, z, bridge);
+  }
+
+  // дерево-великан
+  const tree = new THREE.Group();
+  tree.position.set(-6, 0.8, 4);
+  scene.add(tree);
+  put(new THREE.CylinderGeometry(0.9, 1.3, 7, 8), 0x8b5a2b, 0, 3.5, 0, tree);
+  put(new THREE.IcosahedronGeometry(4.2, 0), 0x3f7d3a, 0, 8.5, 0, tree);
+  put(new THREE.IcosahedronGeometry(3, 0), 0x4f9a48, 2.6, 9.8, 1, tree);
+  put(new THREE.IcosahedronGeometry(2.6, 0), 0x4f9a48, -2.4, 9.4, -1.2, tree);
+
+  // маяк
+  const lh = new THREE.Group();
+  lh.position.set(20, 0.8, -18);
+  scene.add(lh);
+  for (let i = 0; i < 5; i++) put(new THREE.CylinderGeometry(2 - i * 0.18, 2.1 - i * 0.18, 3, 12), i % 2 ? 0xd64545 : 0xf4f1ea, 0, 1.5 + i * 3, 0, lh);
+  put(new THREE.CylinderGeometry(1.5, 1.5, 1.8, 12), 0xf6c343, 0, 15.9, 0, lh);
+  put(new THREE.ConeGeometry(2, 2.2, 12), 0xd64545, 0, 17.9, 0, lh);
+  const lamp = new THREE.PointLight(0xffd36b, 0.8, 40);
+  lamp.position.set(0, 15.9, 0);
+  lh.add(lamp);
+
+  // немного «библиотеки» вокруг
+  const rock = (x, z, s) => { const r = put(new THREE.DodecahedronGeometry(s, 0), 0x9a9a92, x, 0.8 + s * 0.4, z); r.rotation.set(x, z, 0); };
+  rock(-18, -12, 1.6); rock(-22, 6, 2.2); rock(14, 16, 1.4); rock(-4, -22, 1.8); rock(24, 4, 1.2);
+  const bush = (x, z) => put(new THREE.IcosahedronGeometry(1.2, 0), 0x5f9e4f, x, 1.5, z);
+  bush(-12, 12); bush(-16, -2); bush(4, 12); bush(16, -4); bush(-10, -16); bush(12, -26);
+  const palm = (x, z) => { const g = new THREE.Group(); g.position.set(x, 0.8, z); scene.add(g);
+    put(new THREE.CylinderGeometry(0.3, 0.45, 6, 6), 0x9b6b3d, 0, 3, 0, g);
+    for (let i = 0; i < 5; i++) { const l = put(new THREE.BoxGeometry(3.4, 0.12, 0.9), 0x4f9a48, 0, 6, 0, g); l.rotation.y = i * 1.26; l.rotation.z = -0.35; l.translateX(1.5); } };
+  palm(-26, -8); palm(26, 12); palm(-14, 24);
+
+  // тропа: от начала к дереву, к мосту, к маяку
+  const route = [[-20, 20], [-16, 16], [-12, 12.5], [-9, 9], [-4, 1], [-1, -2.5], [2, -5], [4.5, -6], [11.5, -6], [14, -8.5], [16, -11.5], [17.5, -14.5]];
+  const stones = [];
+  for (let i = 0; i < route.length - 1; i++) {
+    const [ax, az] = route[i], [bx, bz] = route[i + 1];
+    const d = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(d / 2));
+    for (let k = 0; k < n; k++) {
+      const t = k / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+      if (x > 5.5 && x < 10.5) continue;
+      const s = put(new THREE.CylinderGeometry(0.65, 0.75, 0.2, 7), 0x9d9d96, x, 0.88, z);
+      s.rotation.y = (i * 7 + k) % 6;
+      stones.push(s);
+    }
+  }
+
+  // столкновения: ствол, маяк, камни-валуны
+  const solids = [{ x: -6, z: 4, r: 1.8 }, { x: 20, z: -18, r: 2.6 }, { x: -18, z: -12, r: 1.8 }, { x: -22, z: 6, r: 2.4 }, { x: 14, z: 16, r: 1.6 }, { x: -4, z: -22, r: 2 }, { x: 24, z: 4, r: 1.4 }];
+
+  // игрок = камера Пика
+  const EYE = 1.7, START = new THREE.Vector3(-21, 0.8 + EYE, 21);
+  const pos = START.clone();
+  let yaw = 0, pitch = -0.05, vy = 0, onGround = true;
+  function resetPos() { pos.copy(START); yaw = Math.atan2(-15, 17); pitch = -0.05; vy = 0; }
+  resetPos();
+
+  const keys = {};
+  let started = false, dragging = false, lx = 0, ly = 0, touchWalk = false;
+  const start = document.getElementById('start');
+  start.addEventListener('click', () => { started = true; start.style.display = 'none'; renderer.domElement.focus(); });
+  document.getElementById('reset').addEventListener('click', e => { e.stopPropagation(); resetPos(); });
+
+  addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'Space') e.preventDefault(); });
+  addEventListener('keyup', e => { keys[e.code] = false; });
+  view.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; });
+  addEventListener('pointerup', () => { dragging = false; });
+  addEventListener('pointermove', e => {
+    if (!dragging || !started) return;
+    yaw -= (e.clientX - lx) * 0.005;
+    pitch = Math.max(-1.2, Math.min(1.2, pitch - (e.clientY - ly) * 0.004));
+    lx = e.clientX; ly = e.clientY;
+  });
+  const tb = document.getElementById('touch');
+  tb.addEventListener('pointerdown', e => { e.stopPropagation(); touchWalk = true; });
+  tb.addEventListener('pointerup', () => { touchWalk = false; });
+  tb.addEventListener('pointerleave', () => { touchWalk = false; });
+
+  addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+  const clock = new THREE.Clock();
+  function step() {
+    requestAnimationFrame(step);
+    let left = Math.min(clock.getDelta(), 0.5);
+    while (started && left > 0) {
+      const dt = Math.min(left, 0.05);
+      left -= dt;
+      let f = 0, s = 0;
+      if (keys.KeyW || keys.ArrowUp || touchWalk) f += 1;
+      if (keys.KeyS || keys.ArrowDown) f -= 1;
+      if (keys.KeyA || keys.ArrowLeft) s -= 1;
+      if (keys.KeyD || keys.ArrowRight) s += 1;
+      const speed = 6;
+      const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+      let nx = pos.x + (fx * f - fz * s) * speed * dt;
+      let nz = pos.z + (fz * f + fx * s) * speed * dt;
+      for (const o of solids) {
+        const dx = nx - o.x, dz = nz - o.z, d = Math.hypot(dx, dz), min = o.r + 0.5;
+        if (d < min) { nx = o.x + dx / d * min; nz = o.z + dz / d * min; }
+      }
+      const rr = Math.hypot(nx, nz);
+      if (rr > R_WALK) { nx *= R_WALK / rr; nz *= R_WALK / rr; }
+      pos.x = nx; pos.z = nz;
+      const onBridge = nx > 4.5 && nx < 11.5 && Math.abs(nz + 6) < 1.6;
+      const ground = 0.8 + EYE + (onBridge ? 0.55 : 0);
+      if ((keys.Space) && onGround) { vy = 6; onGround = false; }
+      vy -= 18 * dt;
+      pos.y += vy * dt;
+      if (pos.y <= ground) { pos.y = ground; vy = 0; onGround = true; }
+    }
+    camera.position.copy(pos);
+    camera.rotation.set(pitch, yaw, 0, 'YXZ');
+    if (!started) camera.rotation.y = yaw + Math.sin(performance.now() / 3000) * 0.15;
+    renderer.render(scene, camera);
+  }
+  step();
+})();
+</script>
+</body>
+</html>
