@@ -97,7 +97,7 @@
   const rock = (x, z, s) => { const r = put(new THREE.DodecahedronGeometry(s, 0), 0x9a9a92, x, 0.8 + s * 0.4, z); r.rotation.set(x, z, 0); };
   rock(-18, -12, 1.6); rock(-22, 6, 2.2); rock(14, 16, 1.4); rock(-4, -22, 1.8); rock(24, 4, 1.2);
   const bush = (x, z) => put(new THREE.IcosahedronGeometry(1.2, 0), 0x5f9e4f, x, 1.5, z);
-  bush(-12, 12); bush(-16, -2); bush(4, 12); bush(16, -4); bush(-10, -16); bush(12, -26);
+  bush(-17, 9); bush(-16, -2); bush(4, 12); bush(16, -4); bush(-10, -16); bush(12, -26);
   const palm = (x, z) => { const g = new THREE.Group(); g.position.set(x, 0.8, z); scene.add(g);
     put(new THREE.CylinderGeometry(0.3, 0.45, 6, 6), 0x9b6b3d, 0, 3, 0, g);
     for (let i = 0; i < 5; i++) { const l = put(new THREE.BoxGeometry(3.4, 0.12, 0.9), 0x4f9a48, 0, 6, 0, g); l.rotation.y = i * 1.26; l.rotation.z = -0.35; l.translateX(1.5); } };
